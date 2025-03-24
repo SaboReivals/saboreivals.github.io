@@ -103,7 +103,7 @@
 			}
 
 			function copyEmail(event) {
-				event.preventDefault(); // Предотвращает открытие почтового клиента
+				event.preventDefault();
 				navigator.clipboard
 					.writeText("saboreivals@gmail.com")
 					.then(() => {
@@ -120,7 +120,7 @@
 				notification.classList.add("show");
 				setTimeout(() => {
 					notification.classList.remove("show");
-				}, 2000); // Уведомление исчезает через 2 секунды
+				}, 2000);
 			}
 		</script>
 	</body>
