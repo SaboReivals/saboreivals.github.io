@@ -1,0 +1,91 @@
+body {
+	margin: 0;
+	padding: 0;
+	font-family: "Nunito", sans-serif;
+	background-color: #f9f9f9;
+	color: #333;
+	line-height: 1.6;
+}
+
+.tl_article {
+	max-width: 700px;
+	margin: 40px auto;
+	padding: 0 20px;
+}
+
+.tl_article_header h1 {
+	font-size: 32px;
+	font-weight: 800;
+	margin-bottom: 10px;
+	color: #222;
+	cursor: pointer; /* Указывает, что элемент кликабелен */
+}
+
+.tl_article_header h1:hover {
+	color: #1a7d34; /* Более контрастный зелёный при наведении */
+}
+
+.tl_article_content {
+	font-size: 18px;
+	font-weight: 500;
+}
+
+.tl_article_content h3 {
+	font-size: 24px;
+	font-weight: 800;
+	margin: 20px 0;
+}
+
+.tl_article_content ul {
+	list-style-type: disc;
+	padding-left: 20px;
+}
+
+.tl_article_content li {
+	margin-bottom: 15px;
+}
+
+.tl_article_content .email-item {
+	margin-bottom: 25px; /* Увеличенный промежуток перед следующим элементом */
+}
+
+.tl_article_content a {
+	color: #1a7d34; /* Более контрастный зелёный цвет ссылок */
+	text-decoration: none;
+}
+
+.tl_article_content a:hover {
+	text-decoration: underline;
+}
+
+.tl_article_content em {
+	color: #666;
+	font-style: italic;
+	font-weight: 500;
+}
+
+.tl_article_content br {
+	display: block;
+	margin: 5px 0;
+}
+
+/* Стили для уведомления */
+.copy-notification {
+	position: fixed;
+	bottom: 20px;
+	left: 50%;
+	transform: translateX(-50%);
+	background-color: #333;
+	color: #fff;
+	padding: 10px 20px;
+	border-radius: 5px;
+	font-size: 16px;
+	font-weight: 500;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+	pointer-events: none; /* Чтобы уведомление не мешало кликам */
+}
+
+.copy-notification.show {
+	opacity: 1;
+}
