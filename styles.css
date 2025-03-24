@@ -18,11 +18,11 @@ body {
 	font-weight: 800;
 	margin-bottom: 10px;
 	color: #222;
-	cursor: pointer; /* Указывает, что элемент кликабелен */
+	cursor: pointer;
 }
 
 .tl_article_header h1:hover {
-	color: #1a7d34; /* Более контрастный зелёный при наведении */
+	color: #1a7d34;
 }
 
 .tl_article_content {
@@ -46,11 +46,11 @@ body {
 }
 
 .tl_article_content .email-item {
-	margin-bottom: 25px; /* Увеличенный промежуток перед следующим элементом */
+	margin-bottom: 45px;
 }
 
 .tl_article_content a {
-	color: #1a7d34; /* Более контрастный зелёный цвет ссылок */
+	color: #1a7d34;
 	text-decoration: none;
 }
 
@@ -83,7 +83,7 @@ body {
 	font-weight: 500;
 	opacity: 0;
 	transition: opacity 0.3s ease;
-	pointer-events: none; /* Чтобы уведомление не мешало кликам */
+	pointer-events: none;
 }
 
 .copy-notification.show {
