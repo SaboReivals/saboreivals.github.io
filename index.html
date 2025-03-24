@@ -1,11 +1,127 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=https://telegra.ph/SaboReivals-07-08">
-    <title>SaboReivals</title>
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
-</head>
-<body>
-</body>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>SaboReivals</title>
+		<link rel="stylesheet" href="styles.css" />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;800&display=swap"
+			rel="stylesheet"
+		/>
+	</head>
+	<body>
+		<main class="tl_article">
+			<header class="tl_article_header">
+				<h1 onclick="copyLink()">SaboReivals</h1>
+			</header>
+			<article class="tl_article_content">
+				<h3 id="Ссылки">Ссылки:</h3>
+				<ul>
+					<li>
+						<a href="https://twitch.tv/saboreivals" target="_blank">Twitch</a>
+						<em>(Стримы)</em>
+					</li>
+					<li>
+						<a href="https://youtube.com/@saboreivals" target="_blank"
+							>YouTube — Основной</a
+						>, <a href="https://youtube.com/@sabomine" target="_blank">Майнкрафт</a>,
+						<a href="https://youtube.com/@sabostreams" target="_blank"
+							>Записи Стримов</a
+						>
+					</li>
+					<li>
+						<a href="https://tiktok.com/@saboreivals" target="_blank"
+							>TikTok — Основной</a
+						>, <a href="https://tiktok.com/@sabo.mine" target="_blank">Майнкрафт</a>
+					</li>
+					<li>
+						<a href="https://t.me/saboreivals" target="_blank">Telegram канал</a>
+						<em>(Новости, Оповещения и всякое разное)</em>
+					</li>
+					<li>
+						<a href="https://discord.gg/e9UQWwc" target="_blank">Discord сервер</a>
+						<em>(Общение)</em>
+					</li>
+					<li>
+						<a href="https://new.donatepay.ru/@saboreivals" target="_blank">DonatePay</a
+						>,
+						<a href="https://donationalerts.com/r/saboreivals" target="_blank"
+							>DonationAlerts</a
+						>,
+						<a href="https://memealerts.com/saboreivals" target="_blank">MemeAlerts</a>
+					</li>
+					<li class="email-item">
+						<a href="mailto:saboreivals@gmail.com" onclick="copyEmail(event)"
+							>Связь — saboreivals@gmail.com</a
+						><br /><em>Любые вопросы, предложения, может быть реклама</em>
+					</li>
+					<li>
+						<a href="https://t.me/sabofiles" target="_blank">Telegram — Файлы</a
+						><br /><em
+							>(<a href="https://t.me/sabofiles/128" target="_blank">TikTok mod</a>,
+							<a href="https://t.me/sabofiles/138" target="_blank"
+								>Minecraft BE APKs</a
+							>,
+							<a href="https://t.me/sabofiles/144" target="_blank">Actions & Stuff</a
+							>, <a href="https://t.me/sabofiles/79" target="_blank">Мои миры</a>)</em
+						>
+					</li>
+					<li>
+						<a href="https://telegra.ph/SSMP-09-21">SSMP (Мой Майнкрафт Сервер)</a
+						><br /><em>Не активен</em>
+					</li>
+					<li>
+						<a href="https://telegra.ph/Minecraft-Vanilla-Pack-09-25"
+							>Minecraft (Моя Ванильная Сборка)</a
+						><br /><em>Не актуальна</em>
+					</li>
+					<li>
+						<a href="https://telegra.ph/SaboReivals--Devices-07-08">Моё Оборудование</a>
+					</li>
+					<li>
+						<a href="https://instagram.com/saboreivals" target="_blank">Instagram</a>,
+						<a href="https://x.com/saboreivals" target="_blank">X.com</a>,
+						<a href="https://kick.com/saboreivals" target="_blank">Kick</a>,
+						<a href="https://vk.com/saboreivals" target="_blank">VK</a>,
+						<a href="https://shikimori.me/saboreivals" target="_blank">Shikimori</a>
+					</li>
+				</ul>
+			</article>
+		</main>
+		<div id="copy-notification" class="copy-notification"></div>
+		<script>
+			function copyLink() {
+				navigator.clipboard
+					.writeText("https://saboreivals.github.io")
+					.then(() => {
+						showNotification("Ссылка скопирована!");
+					})
+					.catch((err) => {
+						console.error("Ошибка копирования: ", err);
+					});
+			}
+
+			function copyEmail(event) {
+				event.preventDefault(); // Предотвращает открытие почтового клиента
+				navigator.clipboard
+					.writeText("saboreivals@gmail.com")
+					.then(() => {
+						showNotification("Почта скопирована!");
+					})
+					.catch((err) => {
+						console.error("Ошибка копирования: ", err);
+					});
+			}
+
+			function showNotification(message) {
+				const notification = document.getElementById("copy-notification");
+				notification.textContent = message;
+				notification.classList.add("show");
+				setTimeout(() => {
+					notification.classList.remove("show");
+				}, 2000); // Уведомление исчезает через 2 секунды
+			}
+		</script>
+	</body>
 </html>
