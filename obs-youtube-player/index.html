@@ -25,12 +25,14 @@
 				width: 100%;
 				height: 100%;
 				overflow: hidden;
+				will-change: transform; /* Оптимизация для анимаций */
 			}
 
 			#player {
 				width: 100%;
 				height: 100%;
 				display: block;
+				transform: translateZ(0); /* Аппаратное ускорение */
 			}
 
 			#info {
@@ -46,10 +48,17 @@
 				opacity: 0;
 				transition: opacity 0.5s;
 				pointer-events: none;
+				will-change: opacity; /* Оптимизация анимации */
+				backface-visibility: hidden; /* Убираем мерцание */
 			}
 
 			#info.visible {
 				opacity: 1;
+			}
+
+			.error-message {
+				color: #ff4444 !important;
+				font-weight: bold;
 			}
 		</style>
 	</head>
@@ -62,66 +71,92 @@
 		<script src="https://www.youtube.com/iframe_api"></script>
 
 		<script>
-			// Парсинг параметров URL с автоматическим определением типа
-			const getUrlParam = (param, defaultValue) => {
-				const url = new URL(window.location.href);
-				const value = url.searchParams.get(param);
-
-				if (value === null) return defaultValue;
-
-				switch (typeof defaultValue) {
-					case "boolean":
-						return value === "true";
-					case "number":
-						return param === "speed" ? parseFloat(value) : parseInt(value, 10);
-					default:
-						return value;
+			class YouTubePlayer {
+				constructor() {
+					this.params = this.loadParams();
+					this.initDOM();
+					this.validateParams();
+					this.initPlayer();
+					this.setupEventListeners();
 				}
-			};
 
-			// Параметры по умолчанию
-			const params = {
-				list: getUrlParam("list", "PLGOpqYkPujc62xpFsvN3c7N7YT4M7kYGQ"),
-				w: getUrlParam("w", null),
-				h: getUrlParam("h", null),
-				loop: getUrlParam("loop", true),
-				random: getUrlParam("random", true),
-				quality: getUrlParam("quality", "hd1080"),
-				forcequality: getUrlParam("forcequality", true),
-				speed: getUrlParam("speed", 1.0),
-				volume: getUrlParam("volume", 0),
-				fade: getUrlParam("fade", false),
-				title: getUrlParam("title", false),
-				controls: getUrlParam("controls", false),
-				hide: getUrlParam("hide", false),
-				hideWhenStopped: getUrlParam("hideWhenStopped", false),
-			};
+				loadParams() {
+					const getParam = (name, defaultValue) => {
+						const url = new URL(location.href);
+						const value = url.searchParams.get(name);
 
-			// Элементы DOM
-			const container = document.getElementById("container");
-			const playerEl = document.getElementById("player");
-			const infoEl = document.getElementById("info");
+						if (value === null) return defaultValue;
 
-			// Установка размеров контейнера
-			if (params.w && params.h) {
-				container.style.width = `${params.w}px`;
-				container.style.height = `${params.h}px`;
-			}
+						switch (typeof defaultValue) {
+							case "boolean":
+								return value === "true";
+							case "number":
+								return name === "speed" ? parseFloat(value) : parseInt(value, 10);
+							default:
+								return value;
+						}
+					};
 
-			// Инициализация плеера
-			let player;
-			function onYouTubeIframeAPIReady() {
-				const playerWidth = params.w || container.offsetWidth;
-				const playerHeight = params.h || container.offsetHeight;
+					return {
+						list: getParam("list", "PLGOpqYkPujc62xpFsvN3c7N7YT4M7kYGQ"),
+						w: getParam("w", null),
+						h: getParam("h", null),
+						loop: getParam("loop", true),
+						random: getParam("random", true),
+						quality: getParam("quality", "hd1080"),
+						forcequality: getParam("forcequality", true),
+						speed: getParam("speed", 1.0),
+						volume: getParam("volume", 0),
+						fade: getParam("fade", false),
+						title: getParam("title", false),
+						controls: getParam("controls", false),
+						hide: getParam("hide", false),
+						hideWhenStopped: getParam("hideWhenStopped", false),
+					};
+				}
 
-				player = new YT.Player("player", {
-					width: playerWidth,
-					height: playerHeight,
-					playerVars: {
+				initDOM() {
+					this.container = document.getElementById("container");
+					this.playerEl = document.getElementById("player");
+					this.infoEl = document.getElementById("info");
+
+					if (this.params.w && this.params.h) {
+						this.container.style.width = `${this.params.w}px`;
+						this.container.style.height = `${this.params.h}px`;
+					}
+				}
+
+				validateParams() {
+					// Корректировка значений
+					this.params.volume = Math.max(0, Math.min(100, this.params.volume));
+					this.params.speed = Math.max(0.25, Math.min(4, this.params.speed));
+
+					if (!this.params.list) {
+						this.showError("Playlist ID is required!", true);
+						throw new Error("Missing playlist ID");
+					}
+				}
+
+				initPlayer() {
+					this.player = new YT.Player("player", {
+						width: this.params.w || this.container.offsetWidth,
+						height: this.params.h || this.container.offsetHeight,
+						playerVars: this.getPlayerVars(),
+						events: {
+							onReady: () => this.onPlayerReady(),
+							onStateChange: (e) => this.onStateChange(e),
+							onPlaybackQualityChange: (e) => this.onQualityChange(e),
+							onError: (e) => this.onPlayerError(e),
+						},
+					});
+				}
+
+				getPlayerVars() {
+					return {
 						listType: "playlist",
-						list: params.list,
+						list: this.params.list,
 						autoplay: 1,
-						controls: params.controls ? 1 : 0,
+						controls: this.params.controls ? 1 : 0,
 						modestbranding: 1,
 						rel: 0,
 						fs: 0,
@@ -131,107 +166,172 @@
 						enablejsapi: 1,
 						playsinline: 1,
 						origin: location.origin,
-					},
-					events: {
-						onReady: initPlayer,
-						onStateChange: handleStateChange,
-						onPlaybackQualityChange: handleQualityChange,
-					},
-				});
-			}
-
-			// Инициализация настроек плеера
-			function initPlayer() {
-				player.setVolume(params.volume);
-				player.setPlaybackRate(params.speed);
-				player.setLoop(params.loop);
-
-				if (params.random) {
-					player.setShuffle(true);
-					player.nextVideo();
+					};
 				}
 
-				if (params.hide) playerEl.style.display = "none";
-				if (params.forcequality) startQualityMonitor();
-				if (params.fade) startFadeEffect();
-			}
+				onPlayerReady() {
+					this.applySettings();
+					if (this.params.fade) this.startFadeEffect();
+					if (this.params.hide) this.playerEl.style.display = "none";
+				}
 
-			// Мониторинг качества видео
-			let qualityInterval;
-			function startQualityMonitor() {
-				qualityInterval = setInterval(() => {
-					if (player.getPlaybackQuality() !== params.quality) {
-						player.setPlaybackQuality(params.quality);
+				applySettings() {
+					this.player.setVolume(this.params.volume);
+					this.player.setPlaybackRate(this.params.speed);
+					this.player.setLoop(this.params.loop);
+
+					if (this.params.random) {
+						this.player.setShuffle(true);
+						this.player.nextVideo();
 					}
-				}, 5000);
-			}
 
-			// Обработчик изменения состояния
-			function handleStateChange(event) {
-				// Скрытие/показ по состоянию
-				if (params.hideWhenStopped) {
-					playerEl.style.display = [YT.PlayerState.ENDED, YT.PlayerState.PAUSED].includes(
-						event.data
-					)
-						? "none"
-						: "block";
+					if (this.params.forcequality) this.startQualityMonitor();
 				}
 
-				// Зацикливание плейлиста
-				if (event.data === YT.PlayerState.ENDED && params.loop) {
-					player.playVideo();
+				startQualityMonitor() {
+					this.qualityInterval = setInterval(() => {
+						const currentQuality = this.player.getPlaybackQuality();
+						if (currentQuality !== this.params.quality) {
+							this.player.setPlaybackQuality(this.params.quality);
+						}
+					}, 5000);
 				}
 
-				// Показ названия трека
-				if (event.data === YT.PlayerState.PLAYING && params.title) {
-					showTitle(player.getVideoData().title);
+				onStateChange(event) {
+					this.handleVisibility(event.data);
+					this.handleLoop(event.data);
+					this.handleTitle(event.data);
 				}
-			}
 
-			// Принудительная установка качества
-			function handleQualityChange(event) {
-				if (params.forcequality && event.data !== params.quality) {
-					player.setPlaybackQuality(params.quality);
+				handleVisibility(state) {
+					if (!this.params.hideWhenStopped) return;
+
+					const hiddenStates = [YT.PlayerState.ENDED, YT.PlayerState.PAUSED];
+					this.playerEl.style.display = hiddenStates.includes(state) ? "none" : "block";
 				}
-			}
 
-			// Показ названия трека
-			function showTitle(title) {
-				infoEl.textContent = title;
-				infoEl.classList.add("visible");
-				setTimeout(() => infoEl.classList.remove("visible"), 3000);
-			}
-
-			// Fade-эффект звука
-			let fadeInterval;
-			function startFadeEffect() {
-				let vol = 0;
-				player.setVolume(vol);
-
-				fadeInterval = setInterval(() => {
-					if (vol < params.volume) player.setVolume(++vol);
-					else {
-						clearInterval(fadeInterval);
-						scheduleFadeOut();
+				handleLoop(state) {
+					if (state === YT.PlayerState.ENDED && this.params.loop) {
+						this.player.playVideo();
 					}
-				}, 50);
+				}
+
+				handleTitle(state) {
+					if (state === YT.PlayerState.PLAYING && this.params.title) {
+						this.showTitle(this.player.getVideoData().title);
+					}
+				}
+
+				onQualityChange(event) {
+					if (!this.params.forcequality) return;
+
+					const available = this.player.getAvailableQualityLevels();
+					if (available.includes(this.params.quality)) {
+						this.player.setPlaybackQuality(this.params.quality);
+					} else {
+						console.warn(`Quality ${this.params.quality} not available`);
+						this.player.setPlaybackQuality(available[0]);
+					}
+				}
+
+				startFadeEffect() {
+					const startTime = Date.now();
+					const fadeDuration = 2000;
+
+					const animateFade = () => {
+						const progress = (Date.now() - startTime) / fadeDuration;
+
+						if (progress < 1) {
+							const vol = Math.min(this.params.volume, progress * this.params.volume);
+							this.player.setVolume(vol);
+							requestAnimationFrame(animateFade);
+						} else {
+							this.player.setVolume(this.params.volume);
+							this.scheduleFadeOut();
+						}
+					};
+
+					requestAnimationFrame(animateFade);
+				}
+
+				scheduleFadeOut() {
+					const fadeOutTime = (this.player.getDuration() - 5) * 1000;
+					if (fadeOutTime <= 0) return;
+
+					setTimeout(() => {
+						const startVol = this.player.getVolume();
+						const startTime = Date.now();
+						const fadeDuration = 2000;
+
+						const animate = () => {
+							const progress = (Date.now() - startTime) / fadeDuration;
+
+							if (progress < 1) {
+								const vol = startVol * (1 - progress);
+								this.player.setVolume(vol);
+								requestAnimationFrame(animate);
+							} else {
+								this.player.setVolume(0);
+							}
+						};
+
+						requestAnimationFrame(animate);
+					}, fadeOutTime);
+				}
+
+				showTitle(title) {
+					this.infoEl.textContent = title;
+					this.infoEl.classList.add("visible");
+					setTimeout(() => this.infoEl.classList.remove("visible"), 3000);
+				}
+
+				showError(message, fatal = false) {
+					this.infoEl.classList.add("error-message");
+					this.infoEl.textContent = message;
+					this.infoEl.classList.add("visible");
+					if (fatal) this.infoEl.style.display = "block";
+				}
+
+				onPlayerError(event) {
+					const errors = {
+						2: "Invalid parameters",
+						5: "HTML5 player error",
+						100: "Video not found",
+						101: "Embedding disabled",
+						150: "Embedding disabled",
+					};
+					this.showError(errors[event.data] || `Error: ${event.data}`);
+				}
+
+				setupEventListeners() {
+					let resizeTimeout;
+					window.addEventListener("resize", () => {
+						clearTimeout(resizeTimeout);
+						resizeTimeout = setTimeout(() => this.handleResize(), 100);
+					});
+				}
+
+				handleResize() {
+					if (!this.params.w && !this.params.h) {
+						this.player.setSize(
+							this.container.offsetWidth,
+							this.container.offsetHeight
+						);
+					}
+				}
 			}
 
-			// Планирование fade-out
-			function scheduleFadeOut() {
-				setTimeout(() => {
-					fadeInterval = setInterval(() => {
-						const vol = player.getVolume();
-						if (vol > 0) player.setVolume(vol - 1);
-						else clearInterval(fadeInterval);
-					}, 50);
-				}, (player.getDuration() - 5) * 1000);
+			// Инициализация при загрузке API
+			let ytPlayer;
+			function onYouTubeIframeAPIReady() {
+				ytPlayer = new YouTubePlayer();
 			}
 
-			// Очистка при выходе
+			// Очистка при закрытии
 			window.addEventListener("beforeunload", () => {
-				clearInterval(qualityInterval);
-				clearInterval(fadeInterval);
+				if (ytPlayer) {
+					clearInterval(ytPlayer.qualityInterval);
+				}
 			});
 		</script>
 	</body>
