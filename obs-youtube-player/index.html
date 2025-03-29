@@ -1,13 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 	<head>
 		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>OBS YouTube Player</title>
-		<link
-			href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap"
-			rel="stylesheet"
-		/>
 		<style>
+			/* Базовые стили для полноэкранного режима */
 			html,
 			body {
 				margin: 0;
@@ -25,54 +23,43 @@
 				width: 100%;
 				height: 100%;
 				overflow: hidden;
-				will-change: transform; /* Оптимизация для анимаций */
 			}
 
 			#player {
 				width: 100%;
 				height: 100%;
 				display: block;
-				transform: translateZ(0); /* Аппаратное ускорение */
 			}
 
-			#info {
+			/* Стили для сообщений об ошибках */
+			.error-message {
 				position: absolute;
 				bottom: 10px;
 				left: 0;
 				right: 0;
 				text-align: center;
-				color: white;
-				text-shadow: 1px 1px 2px black;
-				font-family: Nunito, sans-serif;
+				color: #ff4444;
+				font-family: sans-serif;
 				font-size: 14px;
-				opacity: 0;
-				transition: opacity 0.5s;
-				pointer-events: none;
-				will-change: opacity; /* Оптимизация анимации */
-				backface-visibility: hidden; /* Убираем мерцание */
-			}
-
-			#info.visible {
-				opacity: 1;
-			}
-
-			.error-message {
-				color: #ff4444 !important;
 				font-weight: bold;
+				text-shadow: 1px 1px 2px black;
+				pointer-events: none;
+				display: none; /* Скрыто по умолчанию */
 			}
 		</style>
 	</head>
 	<body>
 		<div id="container">
-			<div id="info"></div>
+			<div class="error-message"></div>
 			<div id="player"></div>
 		</div>
 
 		<script src="https://www.youtube.com/iframe_api"></script>
-
 		<script>
+			// Основной класс для управления YouTube плеером
 			class YouTubePlayer {
 				constructor() {
+					// Инициализация основных компонентов
 					this.params = this.loadParams();
 					this.initDOM();
 					this.validateParams();
@@ -80,114 +67,109 @@
 					this.setupEventListeners();
 				}
 
+				// Загрузка и парсинг параметров из URL
 				loadParams() {
-					const getParam = (name, defaultValue) => {
-						const url = new URL(location.href);
-						const value = url.searchParams.get(name);
+					const params = new URL(location.href).searchParams;
 
-						if (value === null) return defaultValue;
+					// Функция для безопасного получения параметров
+					const getParam = (name, def, type) => {
+						const value = params.get(name);
+						if (value === null) return def;
 
-						switch (typeof defaultValue) {
+						// Преобразование типов
+						switch (type) {
+							case "number":
+								return Number(value);
 							case "boolean":
 								return value === "true";
-							case "number":
-								return name === "speed" ? parseFloat(value) : parseInt(value, 10);
 							default:
-								return value;
+								return value.toString();
 						}
 					};
 
 					return {
-						list: getParam("list", "PLGOpqYkPujc62xpFsvN3c7N7YT4M7kYGQ"),
-						w: getParam("w", null),
-						h: getParam("h", null),
-						loop: getParam("loop", true),
-						random: getParam("random", true),
-						quality: getParam("quality", "hd1080"),
-						forcequality: getParam("forcequality", true),
-						speed: getParam("speed", 1.0),
-						volume: getParam("volume", 0),
-						fade: getParam("fade", false),
-						title: getParam("title", false),
-						controls: getParam("controls", false),
-						hide: getParam("hide", false),
-						hideWhenStopped: getParam("hideWhenStopped", false),
+						list: getParam("list", "PLGOpqYkPujc62xpFsvN3c7N7YT4M7kYGQ", "string"),
+						w: getParam("w", null, "number"),
+						h: getParam("h", null, "number"),
+						loop: getParam("loop", true, "boolean"),
+						random: getParam("random", true, "boolean"),
+						quality: getParam("quality", "hd1080", "string"),
+						forcequality: getParam("forcequality", true, "boolean"),
+						speed: Math.max(0.25, Math.min(4, getParam("speed", 1.0, "number"))),
+						volume: Math.max(0, Math.min(100, getParam("volume", 0, "number"))),
+						controls: getParam("controls", false, "boolean"), // Возвращённый параметр
 					};
 				}
 
+				// Инициализация DOM элементов
 				initDOM() {
 					this.container = document.getElementById("container");
 					this.playerEl = document.getElementById("player");
-					this.infoEl = document.getElementById("info");
+					this.errorEl = document.querySelector(".error-message");
 
+					// Установка кастомных размеров если указаны
 					if (this.params.w && this.params.h) {
 						this.container.style.width = `${this.params.w}px`;
 						this.container.style.height = `${this.params.h}px`;
 					}
 				}
 
+				// Валидация обязательных параметров
 				validateParams() {
-					// Корректировка значений
-					this.params.volume = Math.max(0, Math.min(100, this.params.volume));
-					this.params.speed = Math.max(0.25, Math.min(4, this.params.speed));
-
 					if (!this.params.list) {
 						this.showError("Playlist ID is required!", true);
 						throw new Error("Missing playlist ID");
 					}
 				}
 
+				// Инициализация YouTube плеера
 				initPlayer() {
 					this.player = new YT.Player("player", {
 						width: this.params.w || this.container.offsetWidth,
 						height: this.params.h || this.container.offsetHeight,
-						playerVars: this.getPlayerVars(),
+						playerVars: {
+							listType: "playlist",
+							list: this.params.list,
+							autoplay: 1,
+							controls: this.params.controls ? 1 : 0, // Управление элементами интерфейса
+							modestbranding: 1,
+							rel: 0,
+							fs: 0,
+							disablekb: 1,
+							iv_load_policy: 3,
+							cc_load_policy: 0,
+							enablejsapi: 1,
+							playsinline: 1,
+							origin: location.origin,
+						},
 						events: {
 							onReady: () => this.onPlayerReady(),
 							onStateChange: (e) => this.onStateChange(e),
-							onPlaybackQualityChange: (e) => this.onQualityChange(e),
 							onError: (e) => this.onPlayerError(e),
 						},
 					});
 				}
 
-				getPlayerVars() {
-					return {
-						listType: "playlist",
-						list: this.params.list,
-						autoplay: 1,
-						controls: this.params.controls ? 1 : 0,
-						modestbranding: 1,
-						rel: 0,
-						fs: 0,
-						disablekb: 1,
-						iv_load_policy: 3,
-						cc_load_policy: 0,
-						enablejsapi: 1,
-						playsinline: 1,
-						origin: location.origin,
-					};
-				}
-
+				// Обработчик готовности плеера
 				onPlayerReady() {
-					this.applySettings();
-					if (this.params.fade) this.startFadeEffect();
-					if (this.params.hide) this.playerEl.style.display = "none";
-				}
-
-				applySettings() {
+					// Применение начальных настроек
 					this.player.setVolume(this.params.volume);
 					this.player.setPlaybackRate(this.params.speed);
 					this.player.setLoop(this.params.loop);
 
+					// Запуск случайного воспроизведения если нужно
 					if (this.params.random) {
 						this.player.setShuffle(true);
 						this.player.nextVideo();
 					}
 
-					if (this.params.forcequality) this.startQualityMonitor();
+					// Мониторинг качества воспроизведения
+					if (this.params.forcequality) {
+						this.startQualityMonitor();
+					}
 				}
 
+				// Мониторинг и поддержание качества видео
 				startQualityMonitor() {
 					this.qualityInterval = setInterval(() => {
 						const currentQuality = this.player.getPlaybackQuality();
@@ -197,140 +179,69 @@
 					}, 5000);
 				}
 
+				// Обработчик изменения состояния воспроизведения
 				onStateChange(event) {
-					this.handleVisibility(event.data);
-					this.handleLoop(event.data);
-					this.handleTitle(event.data);
-				}
-
-				handleVisibility(state) {
-					if (!this.params.hideWhenStopped) return;
-
-					const hiddenStates = [YT.PlayerState.ENDED, YT.PlayerState.PAUSED];
-					this.playerEl.style.display = hiddenStates.includes(state) ? "none" : "block";
-				}
-
-				handleLoop(state) {
-					if (state === YT.PlayerState.ENDED && this.params.loop) {
+					// Автоповтор плейлиста
+					if (event.data === YT.PlayerState.ENDED && this.params.loop) {
 						this.player.playVideo();
 					}
 				}
 
-				handleTitle(state) {
-					if (state === YT.PlayerState.PLAYING && this.params.title) {
-						this.showTitle(this.player.getVideoData().title);
-					}
-				}
-
-				onQualityChange(event) {
-					if (!this.params.forcequality) return;
-
-					const available = this.player.getAvailableQualityLevels();
-					if (available.includes(this.params.quality)) {
-						this.player.setPlaybackQuality(this.params.quality);
-					} else {
-						console.warn(`Quality ${this.params.quality} not available`);
-						this.player.setPlaybackQuality(available[0]);
-					}
-				}
-
-				startFadeEffect() {
-					const startTime = Date.now();
-					const fadeDuration = 2000;
-
-					const animateFade = () => {
-						const progress = (Date.now() - startTime) / fadeDuration;
-
-						if (progress < 1) {
-							const vol = Math.min(this.params.volume, progress * this.params.volume);
-							this.player.setVolume(vol);
-							requestAnimationFrame(animateFade);
-						} else {
-							this.player.setVolume(this.params.volume);
-							this.scheduleFadeOut();
-						}
-					};
-
-					requestAnimationFrame(animateFade);
-				}
-
-				scheduleFadeOut() {
-					const fadeOutTime = (this.player.getDuration() - 5) * 1000;
-					if (fadeOutTime <= 0) return;
-
-					setTimeout(() => {
-						const startVol = this.player.getVolume();
-						const startTime = Date.now();
-						const fadeDuration = 2000;
-
-						const animate = () => {
-							const progress = (Date.now() - startTime) / fadeDuration;
-
-							if (progress < 1) {
-								const vol = startVol * (1 - progress);
-								this.player.setVolume(vol);
-								requestAnimationFrame(animate);
-							} else {
-								this.player.setVolume(0);
-							}
-						};
-
-						requestAnimationFrame(animate);
-					}, fadeOutTime);
-				}
-
-				showTitle(title) {
-					this.infoEl.textContent = title;
-					this.infoEl.classList.add("visible");
-					setTimeout(() => this.infoEl.classList.remove("visible"), 3000);
-				}
-
+				// Показать сообщение об ошибке
 				showError(message, fatal = false) {
-					this.infoEl.classList.add("error-message");
-					this.infoEl.textContent = message;
-					this.infoEl.classList.add("visible");
-					if (fatal) this.infoEl.style.display = "block";
+					this.errorEl.textContent = message;
+					this.errorEl.style.display = "block";
+					if (fatal) throw new Error(message);
 				}
 
+				// Обработчик ошибок плеера
 				onPlayerError(event) {
-					const errors = {
+					const errorMap = {
 						2: "Invalid parameters",
 						5: "HTML5 player error",
 						100: "Video not found",
 						101: "Embedding disabled",
 						150: "Embedding disabled",
 					};
-					this.showError(errors[event.data] || `Error: ${event.data}`);
+					this.showError(errorMap[event.data] || `Error code: ${event.data}`);
 				}
 
+				// Настройка обработчиков событий
 				setupEventListeners() {
-					let resizeTimeout;
-					window.addEventListener("resize", () => {
-						clearTimeout(resizeTimeout);
-						resizeTimeout = setTimeout(() => this.handleResize(), 100);
-					});
-				}
+					// Оптимизация обработки изменения размеров
+					const debounce = (fn, delay) => {
+						let timeout;
+						return (...args) => {
+							clearTimeout(timeout);
+							timeout = setTimeout(() => fn(...args), delay);
+						};
+					};
 
-				handleResize() {
-					if (!this.params.w && !this.params.h) {
-						this.player.setSize(
-							this.container.offsetWidth,
-							this.container.offsetHeight
-						);
-					}
+					// Обработчик изменения размера окна
+					window.addEventListener(
+						"resize",
+						debounce(() => {
+							if (!this.params.w && !this.params.h) {
+								this.player.setSize(
+									this.container.offsetWidth,
+									this.container.offsetHeight
+								);
+							}
+						}, 100)
+					);
 				}
 			}
 
-			// Инициализация при загрузке API
-			let ytPlayer;
+			// Глобальная инициализация при загрузке API
+			let playerInstance;
 			function onYouTubeIframeAPIReady() {
-				ytPlayer = new YouTubePlayer();
+				playerInstance = new YouTubePlayer();
 			}
 
-			// Очистка при закрытии
+			// Очистка ресурсов при закрытии
 			window.addEventListener("beforeunload", () => {
-				if (ytPlayer) {
-					clearInterval(ytPlayer.qualityInterval);
+				if (playerInstance) {
+					clearInterval(playerInstance.qualityInterval);
 				}
 			});
 		</script>
