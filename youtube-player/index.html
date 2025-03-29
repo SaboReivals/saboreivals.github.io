@@ -2,19 +2,34 @@
 <html>
 	<head>
 		<style>
-			* {
+			/* Сброс стандартных отступов и задание базовых стилей */
+			html,
+			body {
 				margin: 0;
 				padding: 0;
-				box-sizing: border-box;
+				width: 100%;
+				height: 100%;
+				overflow: hidden; /* Убираем скроллбары */
+				background: transparent; /* Прозрачный фон для интеграции с OBS */
 			}
-			body {
-				background: transparent;
-				overflow: hidden;
-			}
-			#player {
+
+			/* Основной контейнер занимает все доступное пространство */
+			#container {
+				position: fixed;
+				top: 0;
+				left: 0;
 				width: 100%;
 				height: 100%;
 			}
+
+			/* Сам плеер YouTube - растягиваем на весь контейнер */
+			#player {
+				width: 100%;
+				height: 100%;
+				display: block;
+			}
+
+			/* Стили для отображения названия трека */
 			#info {
 				position: absolute;
 				bottom: 10px;
@@ -25,61 +40,86 @@
 				text-shadow: 1px 1px 2px black;
 				font-family: Arial, sans-serif;
 				font-size: 14px;
-				opacity: 0;
-				transition: opacity 0.5s;
+				opacity: 0; /* Начально невидим */
+				transition: opacity 0.5s; /* Плавное появление */
+				pointer-events: none; /* Клики проходят сквозь элемент */
 			}
+
+			/* Класс для отображения названия трека */
 			#info.visible {
 				opacity: 1;
 			}
 		</style>
 	</head>
 	<body>
-		<div id="info"></div>
-		<div id="player"></div>
+		<!-- Основной контейнер для плеера -->
+		<div id="container">
+			<!-- Блок для отображения информации о треке -->
+			<div id="info"></div>
+			<!-- Контейнер, в который YouTube API вставит iframe -->
+			<div id="player"></div>
+		</div>
 
+		<!-- Подключаем YouTube IFrame API -->
 		<script src="https://www.youtube.com/iframe_api"></script>
+
 		<script>
-			// Получение параметров из URL
-			const url = new URL(window.location.href);
-			const getParam = (name, defaultValue, isBool = false) => {
-				const value = url.searchParams.get(name);
-				return isBool
-					? value === "true"
-					: value !== null
-					? typeof defaultValue === "number"
-						? parseFloat(value)
-						: value
-					: defaultValue;
+			// Функция для удобного получения параметров из URL
+			const getUrlParam = (param, defaultValue, isBoolean = false) => {
+				const url = new URL(window.location.href);
+				const value = url.searchParams.get(param);
+
+				if (isBoolean) {
+					return value === "true";
+				}
+
+				if (value === null) {
+					return defaultValue;
+				}
+
+				// Для числовых параметров делаем преобразование
+				if (typeof defaultValue === "number") {
+					return param === "speed" ? parseFloat(value) : parseInt(value);
+				}
+
+				return value;
 			};
 
+			// Получаем все параметры из URL
 			const params = {
-				list: getParam("list", null),
-				w: getParam("w", 1920, false, true),
-				h: getParam("h", 1080, false, true),
-				loop: getParam("loop", false, true),
-				random: getParam("random", false, true),
-				quality: getParam("quality", "hd1080"),
-				forcequality: getParam("forcequality", false, true),
-				speed: getParam("speed", 1.0, false, true),
-				volume: getParam("volume", 0, false, true),
-				fade: getParam("fade", false, true),
-				title: getParam("title", false, true),
-				controls: getParam("controls", false, true),
-				hide: getParam("hide", false, true),
-				hideWhenStopped: getParam("hideWhenStopped", false, true),
+				list: getUrlParam("list", null), // ID плейлиста (обязательный)
+				w: getUrlParam("w", 1920, false), // Ширина плеера
+				h: getUrlParam("h", 1080, false), // Высота плеера
+				loop: getUrlParam("loop", false, true), // Зацикливание
+				random: getUrlParam("random", false, true), // Случайный порядок
+				quality: getUrlParam("quality", "hd1080"), // Качество видео
+				forcequality: getUrlParam("forcequality", false, true), // Принудительное качество
+				speed: getUrlParam("speed", 1.0, false), // Скорость воспроизведения
+				volume: getUrlParam("volume", 0, false), // Громкость (0-100)
+				fade: getUrlParam("fade", false, true), // Плавное изменение громкости
+				title: getUrlParam("title", false, true), // Показ названия трека
+				controls: getUrlParam("controls", false, true), // Элементы управления
+				hide: getUrlParam("hide", false, true), // Скрыть плеер
+				hideWhenStopped: getUrlParam("hideWhenStopped", false, true), // Скрывать при остановке
 			};
 
-			// Инициализация элементов
+			// Ссылки на DOM элементы
+			const playerContainer = document.getElementById("container");
 			const playerElement = document.getElementById("player");
 			const infoElement = document.getElementById("info");
-			if (params.hide) playerElement.style.display = "none";
 
-			let player;
-			let qualityCheckInterval;
-			let fadeInterval;
-			let currentVolume = params.volume;
+			// Скрываем плеер сразу, если нужно
+			if (params.hide) {
+				playerElement.style.display = "none";
+			}
 
-			// Функции для работы с YouTube API
+			// Переменные для хранения состояния
+			let player; // Объект плеера YouTube
+			let qualityCheckInterval; // Интервал проверки качества
+			let fadeInterval; // Интервал для эффекта fade
+			let currentVolume = params.volume; // Текущая громкость
+
+			// Функция вызывается, когда YouTube API загрузилось
 			function onYouTubeIframeAPIReady() {
 				player = new YT.Player("player", {
 					width: params.w,
@@ -93,93 +133,114 @@
 				});
 			}
 
+			// Возвращает параметры для плеера
 			function getPlayerVars() {
 				return {
 					listType: "playlist",
 					list: params.list,
-					autoplay: 1,
-					controls: params.controls ? 1 : 0,
-					modestbranding: 1,
-					rel: 0,
-					fs: 0,
-					disablekb: 1,
-					iv_load_policy: 3,
-					cc_load_policy: 0,
-					enablejsapi: 1,
-					playsinline: 1,
-					origin: window.location.origin,
+					autoplay: 1, // Автозапуск
+					controls: params.controls ? 1 : 0, // Элементы управления
+					modestbranding: 1, // Минимизировать лого YouTube
+					rel: 0, // Не показывать похожие видео
+					fs: 0, // Отключить полноэкранный режим
+					disablekb: 1, // Отключить клавиатурные управление
+					iv_load_policy: 3, // Скрыть аннотации
+					cc_load_policy: 0, // Скрыть субтитры
+					enablejsapi: 1, // Включить JS API
+					playsinline: 1, // Воспроизведение в странице
+					origin: window.location.origin, // Важно для безопасности
 				};
 			}
 
-			// Обработчики событий плеера
+			// Обработчик готовности плеера
 			function onPlayerReady(event) {
 				applyPlayerSettings();
-				if (params.fade) startFadeEffect();
+				if (params.fade) {
+					startFadeEffect();
+				}
 			}
 
+			// Применяет настройки из параметров URL
 			function applyPlayerSettings() {
 				player.setVolume(params.volume);
 				player.setPlaybackRate(params.speed);
 				player.setLoop(params.loop);
+
 				if (params.random) {
 					player.setShuffle(true);
-					player.nextVideo();
+					player.nextVideo(); // Начинаем со случайного видео
 				}
+
 				if (params.forcequality) {
 					enforceQuality();
+					// Периодически проверяем и восстанавливаем качество
 					qualityCheckInterval = setInterval(enforceQuality, 5000);
 				}
 			}
 
+			// Обработчик изменения состояния плеера
 			function onPlayerStateChange(event) {
 				handleHideWhenStopped(event.data);
 				handleLoop(event.data);
+
 				if (event.data === YT.PlayerState.PLAYING && params.title) {
 					showVideoTitle();
 				}
 			}
 
+			// Обработчик изменения качества видео
 			function onPlaybackQualityChange(event) {
 				if (params.forcequality && event.data !== params.quality) {
 					player.setPlaybackQuality(params.quality);
 				}
 			}
 
-			// Вспомогательные функции
+			// Принудительно устанавливает качество видео
 			function enforceQuality() {
 				if (player.getPlaybackQuality() !== params.quality) {
 					player.setPlaybackQuality(params.quality);
 				}
 			}
 
+			// Обрабатывает параметр hideWhenStopped
 			function handleHideWhenStopped(state) {
 				if (!params.hideWhenStopped) return;
+
 				playerElement.style.display =
 					state === YT.PlayerState.ENDED || state === YT.PlayerState.PAUSED
 						? "none"
 						: "block";
 			}
 
+			// Обрабатывает зацикливание плейлиста
 			function handleLoop(state) {
 				if (state === YT.PlayerState.ENDED && params.loop) {
 					player.playVideo();
 				}
 			}
 
+			// Показывает название текущего трека
 			function showVideoTitle() {
 				const videoData = player.getVideoData();
 				infoElement.innerHTML = `${videoData.title}`;
 				infoElement.classList.add("visible");
-				setTimeout(() => infoElement.classList.remove("visible"), 3000);
+
+				// Автоматически скрываем через 3 секунды
+				setTimeout(() => {
+					infoElement.classList.remove("visible");
+				}, 3000);
 			}
 
+			// Запускает эффект плавного появления/исчезновения звука
 			function startFadeEffect() {
 				let volume = 0;
 				player.setVolume(volume);
 
+				// Fade-in (плавное увеличение громкости)
 				fadeInterval = setInterval(() => {
 					if (volume < params.volume) {
-						player.setVolume(++volume);
+						volume += 1;
+						player.setVolume(volume);
 					} else {
 						clearInterval(fadeInterval);
 						setupFadeOut();
@@ -187,9 +248,11 @@
 				}, 50);
 			}
 
+			// Настраивает fade-out (плавное уменьшение громкости перед окончанием)
 			function setupFadeOut() {
 				const duration = player.getDuration();
-				const fadeOutTime = (duration - 5) * 1000;
+				const fadeOutTime = (duration - 5) * 1000; // Начинать за 5 сек до конца
+
 				if (fadeOutTime > 0) {
 					setTimeout(() => {
 						fadeInterval = setInterval(() => {
@@ -204,7 +267,7 @@
 				}
 			}
 
-			// Очистка при закрытии
+			// Очистка при закрытии страницы
 			window.addEventListener("beforeunload", cleanup);
 			function cleanup() {
 				if (qualityCheckInterval) clearInterval(qualityCheckInterval);
