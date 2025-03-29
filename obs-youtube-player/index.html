@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>OBS YouTube Player</title>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap"
+			rel="stylesheet"
+		/>
+		<style>
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: transparent;
+			}
+
+			#container {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+			}
+
+			#player {
+				width: 100%;
+				height: 100%;
+				display: block;
+			}
+
+			#info {
+				position: absolute;
+				bottom: 10px;
+				left: 0;
+				right: 0;
+				text-align: center;
+				color: white;
+				text-shadow: 1px 1px 2px black;
+				font-family: Nunito, sans-serif;
+				font-size: 14px;
+				opacity: 0;
+				transition: opacity 0.5s;
+				pointer-events: none;
+			}
+
+			#info.visible {
+				opacity: 1;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="container">
+			<div id="info"></div>
+			<div id="player"></div>
+		</div>
+
+		<script src="https://www.youtube.com/iframe_api"></script>
+
+		<script>
+			// Парсинг параметров URL с автоматическим определением типа
+			const getUrlParam = (param, defaultValue) => {
+				const url = new URL(window.location.href);
+				const value = url.searchParams.get(param);
+
+				if (value === null) return defaultValue;
+
+				switch (typeof defaultValue) {
+					case "boolean":
+						return value === "true";
+					case "number":
+						return param === "speed" ? parseFloat(value) : parseInt(value, 10);
+					default:
+						return value;
+				}
+			};
+
+			// Параметры по умолчанию
+			const params = {
+				list: getUrlParam("list", "PLGOpqYkPujc62xpFsvN3c7N7YT4M7kYGQ"),
+				w: getUrlParam("w", null),
+				h: getUrlParam("h", null),
+				loop: getUrlParam("loop", true),
+				random: getUrlParam("random", true),
+				quality: getUrlParam("quality", "hd1080"),
+				forcequality: getUrlParam("forcequality", true),
+				speed: getUrlParam("speed", 1.0),
+				volume: getUrlParam("volume", 0),
+				fade: getUrlParam("fade", false),
+				title: getUrlParam("title", false),
+				controls: getUrlParam("controls", false),
+				hide: getUrlParam("hide", false),
+				hideWhenStopped: getUrlParam("hideWhenStopped", false),
+			};
+
+			// Элементы DOM
+			const container = document.getElementById("container");
+			const playerEl = document.getElementById("player");
+			const infoEl = document.getElementById("info");
+
+			// Установка размеров контейнера
+			if (params.w && params.h) {
+				container.style.width = `${params.w}px`;
+				container.style.height = `${params.h}px`;
+			}
+
+			// Инициализация плеера
+			let player;
+			function onYouTubeIframeAPIReady() {
+				const playerWidth = params.w || container.offsetWidth;
+				const playerHeight = params.h || container.offsetHeight;
+
+				player = new YT.Player("player", {
+					width: playerWidth,
+					height: playerHeight,
+					playerVars: {
+						listType: "playlist",
+						list: params.list,
+						autoplay: 1,
+						controls: params.controls ? 1 : 0,
+						modestbranding: 1,
+						rel: 0,
+						fs: 0,
+						disablekb: 1,
+						iv_load_policy: 3,
+						cc_load_policy: 0,
+						enablejsapi: 1,
+						playsinline: 1,
+						origin: location.origin,
+					},
+					events: {
+						onReady: initPlayer,
+						onStateChange: handleStateChange,
+						onPlaybackQualityChange: handleQualityChange,
+					},
+				});
+			}
+
+			// Инициализация настроек плеера
+			function initPlayer() {
+				player.setVolume(params.volume);
+				player.setPlaybackRate(params.speed);
+				player.setLoop(params.loop);
+
+				if (params.random) {
+					player.setShuffle(true);
+					player.nextVideo();
+				}
+
+				if (params.hide) playerEl.style.display = "none";
+				if (params.forcequality) startQualityMonitor();
+				if (params.fade) startFadeEffect();
+			}
+
+			// Мониторинг качества видео
+			let qualityInterval;
+			function startQualityMonitor() {
+				qualityInterval = setInterval(() => {
+					if (player.getPlaybackQuality() !== params.quality) {
+						player.setPlaybackQuality(params.quality);
+					}
+				}, 5000);
+			}
+
+			// Обработчик изменения состояния
+			function handleStateChange(event) {
+				// Скрытие/показ по состоянию
+				if (params.hideWhenStopped) {
+					playerEl.style.display = [YT.PlayerState.ENDED, YT.PlayerState.PAUSED].includes(
+						event.data
+					)
+						? "none"
+						: "block";
+				}
+
+				// Зацикливание плейлиста
+				if (event.data === YT.PlayerState.ENDED && params.loop) {
+					player.playVideo();
+				}
+
+				// Показ названия трека
+				if (event.data === YT.PlayerState.PLAYING && params.title) {
+					showTitle(player.getVideoData().title);
+				}
+			}
+
+			// Принудительная установка качества
+			function handleQualityChange(event) {
+				if (params.forcequality && event.data !== params.quality) {
+					player.setPlaybackQuality(params.quality);
+				}
+			}
+
+			// Показ названия трека
+			function showTitle(title) {
+				infoEl.textContent = title;
+				infoEl.classList.add("visible");
+				setTimeout(() => infoEl.classList.remove("visible"), 3000);
+			}
+
+			// Fade-эффект звука
+			let fadeInterval;
+			function startFadeEffect() {
+				let vol = 0;
+				player.setVolume(vol);
+
+				fadeInterval = setInterval(() => {
+					if (vol < params.volume) player.setVolume(++vol);
+					else {
+						clearInterval(fadeInterval);
+						scheduleFadeOut();
+					}
+				}, 50);
+			}
+
+			// Планирование fade-out
+			function scheduleFadeOut() {
+				setTimeout(() => {
+					fadeInterval = setInterval(() => {
+						const vol = player.getVolume();
+						if (vol > 0) player.setVolume(vol - 1);
+						else clearInterval(fadeInterval);
+					}, 50);
+				}, (player.getDuration() - 5) * 1000);
+			}
+
+			// Очистка при выходе
+			window.addEventListener("beforeunload", () => {
+				clearInterval(qualityInterval);
+				clearInterval(fadeInterval);
+			});
+		</script>
+	</body>
+</html>
