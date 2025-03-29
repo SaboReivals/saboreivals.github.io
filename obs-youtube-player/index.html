@@ -1,249 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>OBS YouTube Player</title>
-		<style>
-			/* Базовые стили для полноэкранного режима */
-			html,
-			body {
-				margin: 0;
-				padding: 0;
-				width: 100%;
-				height: 100%;
-				overflow: hidden;
-				background: transparent;
-			}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBS YouTube Player</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+        }
 
-			#container {
-				position: fixed;
-				top: 0;
-				left: 0;
-				width: 100%;
-				height: 100%;
-				overflow: hidden;
-			}
+        #container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
 
-			#player {
-				width: 100%;
-				height: 100%;
-				display: block;
-			}
+        #player {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
 
-			/* Стили для сообщений об ошибках */
-			.error-message {
-				position: absolute;
-				bottom: 10px;
-				left: 0;
-				right: 0;
-				text-align: center;
-				color: #ff4444;
-				font-family: sans-serif;
-				font-size: 14px;
-				font-weight: bold;
-				text-shadow: 1px 1px 2px black;
-				pointer-events: none;
-				display: none; /* Скрыто по умолчанию */
-			}
-		</style>
-	</head>
-	<body>
-		<div id="container">
-			<div class="error-message"></div>
-			<div id="player"></div>
-		</div>
+        .error-message {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: #ff4444;
+            font-family: sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="error-message"></div>
+        <div id="player"></div>
+    </div>
 
-		<script src="https://www.youtube.com/iframe_api"></script>
-		<script>
-			// Основной класс для управления YouTube плеером
-			class YouTubePlayer {
-				constructor() {
-					// Инициализация основных компонентов
-					this.params = this.loadParams();
-					this.initDOM();
-					this.validateParams();
-					this.initPlayer();
-					this.setupEventListeners();
-				}
+    <script>
+        document.write('<script src="https://www.youtube.com/iframe_api?rand=' + 
+          Math.random().toString(36).substring(7) + '"><\/script>');
+    </script>
+    <script>
+        class YouTubePlayer {
+            constructor() {
+                this.params = this.loadParams();
+                this.initDOM();
+                this.validateParams();
+                this.initPlayer();
+                this.setupEventListeners();
+            }
 
-				// Загрузка и парсинг параметров из URL
-				loadParams() {
-					const params = new URL(location.href).searchParams;
+            loadParams() {
+                const params = new URL(location.href).searchParams;
+                const getParam = (name, def, type) => {
+                    const value = params.get(name);
+                    if (value === null) return def;
+                    
+                    switch(type) {
+                        case 'number': return Number(value);
+                        case 'boolean': return value === 'true';
+                        default: return value.toString();
+                    }
+                };
 
-					// Функция для безопасного получения параметров
-					const getParam = (name, def, type) => {
-						const value = params.get(name);
-						if (value === null) return def;
+                return {
+                    list: getParam('list', 'PLGOpqYkPujc62xpFsvN3c7N7YT4M7kYGQ', 'string'),
+                    w: getParam('w', null, 'number'),
+                    h: getParam('h', null, 'number'),
+                    loop: getParam('loop', true, 'boolean'),
+                    random: getParam('random', true, 'boolean'),
+                    quality: getParam('quality', 'hd1080', 'string'),
+                    forcequality: getParam('forcequality', true, 'boolean'),
+                    speed: Math.max(0.25, Math.min(4, getParam('speed', 1.0, 'number'))),
+                    volume: Math.max(0, Math.min(100, getParam('volume', 0, 'number'))),
+                    controls: getParam('controls', false, 'boolean')
+                };
+            }
 
-						// Преобразование типов
-						switch (type) {
-							case "number":
-								return Number(value);
-							case "boolean":
-								return value === "true";
-							default:
-								return value.toString();
-						}
-					};
+            initDOM() {
+                this.container = document.getElementById('container');
+                this.playerEl = document.getElementById('player');
+                this.errorEl = document.querySelector('.error-message');
 
-					return {
-						list: getParam("list", "PLGOpqYkPujc62xpFsvN3c7N7YT4M7kYGQ", "string"),
-						w: getParam("w", null, "number"),
-						h: getParam("h", null, "number"),
-						loop: getParam("loop", true, "boolean"),
-						random: getParam("random", true, "boolean"),
-						quality: getParam("quality", "hd1080", "string"),
-						forcequality: getParam("forcequality", true, "boolean"),
-						speed: Math.max(0.25, Math.min(4, getParam("speed", 1.0, "number"))),
-						volume: Math.max(0, Math.min(100, getParam("volume", 0, "number"))),
-						controls: getParam("controls", false, "boolean"), // Возвращённый параметр
-					};
-				}
+                if (this.params.w && this.params.h) {
+                    this.container.style.width = `${this.params.w}px`;
+                    this.container.style.height = `${this.params.h}px`;
+                }
+            }
 
-				// Инициализация DOM элементов
-				initDOM() {
-					this.container = document.getElementById("container");
-					this.playerEl = document.getElementById("player");
-					this.errorEl = document.querySelector(".error-message");
+            validateParams() {
+                if (!this.params.list) {
+                    this.showError('Playlist ID is required!', true);
+                    throw new Error('Missing playlist ID');
+                }
+            }
 
-					// Установка кастомных размеров если указаны
-					if (this.params.w && this.params.h) {
-						this.container.style.width = `${this.params.w}px`;
-						this.container.style.height = `${this.params.h}px`;
-					}
-				}
+            initPlayer() {
+                this.player = new YT.Player('player', {
+                    width: this.params.w || this.container.offsetWidth,
+                    height: this.params.h || this.container.offsetHeight,
+                    playerVars: {
+                        listType: 'playlist',
+                        list: this.params.list,
+                        autoplay: 1,
+                        controls: this.params.controls ? 1 : 0,
+                        modestbranding: 1,
+                        rel: 0,
+                        fs: 0,
+                        disablekb: 1,
+                        iv_load_policy: 3,
+                        cc_load_policy: 0,
+                        enablejsapi: 1,
+                        playsinline: 1,
+                        origin: location.origin
+                    },
+                    events: {
+                        onReady: () => this.onPlayerReady(),
+                        onStateChange: (e) => this.onStateChange(e),
+                        onError: (e) => this.onPlayerError(e)
+                    }
+                });
+            }
 
-				// Валидация обязательных параметров
-				validateParams() {
-					if (!this.params.list) {
-						this.showError("Playlist ID is required!", true);
-						throw new Error("Missing playlist ID");
-					}
-				}
+            onPlayerReady() {
+                this.player.setVolume(this.params.volume);
+                this.player.setPlaybackRate(this.params.speed);
+                this.player.setLoop(this.params.loop);
 
-				// Инициализация YouTube плеера
-				initPlayer() {
-					this.player = new YT.Player("player", {
-						width: this.params.w || this.container.offsetWidth,
-						height: this.params.h || this.container.offsetHeight,
-						playerVars: {
-							listType: "playlist",
-							list: this.params.list,
-							autoplay: 1,
-							controls: this.params.controls ? 1 : 0, // Управление элементами интерфейса
-							modestbranding: 1,
-							rel: 0,
-							fs: 0,
-							disablekb: 1,
-							iv_load_policy: 3,
-							cc_load_policy: 0,
-							enablejsapi: 1,
-							playsinline: 1,
-							origin: location.origin,
-						},
-						events: {
-							onReady: () => this.onPlayerReady(),
-							onStateChange: (e) => this.onStateChange(e),
-							onError: (e) => this.onPlayerError(e),
-						},
-					});
-				}
+                if (this.params.random) {
+                    this.player.setShuffle(true);
+                    
+                    setTimeout(() => {
+                        try {
+                            const playlist = this.player.getPlaylist();
+                            const index = Math.floor(Math.random() * playlist.length);
+                            this.player.playVideoAt(index);
+                        } catch(e) {
+                            console.warn('Random play error:', e);
+                            this.player.nextVideo();
+                        }
+                    }, 1000);
+                }
 
-				// Обработчик готовности плеера
-				onPlayerReady() {
-					// Применение начальных настроек
-					this.player.setVolume(this.params.volume);
-					this.player.setPlaybackRate(this.params.speed);
-					this.player.setLoop(this.params.loop);
+                if (this.params.forcequality) {
+                    this.startQualityMonitor();
+                }
+            }
 
-					// Запуск случайного воспроизведения если нужно
-					if (this.params.random) {
-						this.player.setShuffle(true);
-						this.player.nextVideo();
-					}
+            startQualityMonitor() {
+                this.qualityInterval = setInterval(() => {
+                    const current = this.player.getPlaybackQuality();
+                    if (current !== this.params.quality) {
+                        this.player.setPlaybackQuality(this.params.quality);
+                    }
+                }, 5000);
+            }
 
-					// Мониторинг качества воспроизведения
-					if (this.params.forcequality) {
-						this.startQualityMonitor();
-					}
-				}
+            onStateChange(event) {
+                if (event.data === YT.PlayerState.ENDED && this.params.loop) {
+                    this.player.playVideo();
+                }
+            }
 
-				// Мониторинг и поддержание качества видео
-				startQualityMonitor() {
-					this.qualityInterval = setInterval(() => {
-						const currentQuality = this.player.getPlaybackQuality();
-						if (currentQuality !== this.params.quality) {
-							this.player.setPlaybackQuality(this.params.quality);
-						}
-					}, 5000);
-				}
+            showError(message, fatal = false) {
+                this.errorEl.textContent = message;
+                this.errorEl.style.display = 'block';
+                if (fatal) throw new Error(message);
+            }
 
-				// Обработчик изменения состояния воспроизведения
-				onStateChange(event) {
-					// Автоповтор плейлиста
-					if (event.data === YT.PlayerState.ENDED && this.params.loop) {
-						this.player.playVideo();
-					}
-				}
+            onPlayerError(event) {
+                const errorMap = {
+                    2: 'Invalid parameters',
+                    5: 'HTML5 player error',
+                    100: 'Video not found',
+                    101: 'Embedding disabled',
+                    150: 'Embedding disabled'
+                };
+                this.showError(errorMap[event.data] || `Error code: ${event.data}`);
+            }
 
-				// Показать сообщение об ошибке
-				showError(message, fatal = false) {
-					this.errorEl.textContent = message;
-					this.errorEl.style.display = "block";
-					if (fatal) throw new Error(message);
-				}
+            setupEventListeners() {
+                const debounce = (fn, delay) => {
+                    let timeout;
+                    return (...args) => {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => fn(...args), delay);
+                    };
+                };
 
-				// Обработчик ошибок плеера
-				onPlayerError(event) {
-					const errorMap = {
-						2: "Invalid parameters",
-						5: "HTML5 player error",
-						100: "Video not found",
-						101: "Embedding disabled",
-						150: "Embedding disabled",
-					};
-					this.showError(errorMap[event.data] || `Error code: ${event.data}`);
-				}
+                window.addEventListener('resize', debounce(() => {
+                    if (!this.params.w && !this.params.h) {
+                        this.player.setSize(
+                            this.container.offsetWidth,
+                            this.container.offsetHeight
+                        );
+                    }
+                }, 100));
+            }
+        }
 
-				// Настройка обработчиков событий
-				setupEventListeners() {
-					// Оптимизация обработки изменения размеров
-					const debounce = (fn, delay) => {
-						let timeout;
-						return (...args) => {
-							clearTimeout(timeout);
-							timeout = setTimeout(() => fn(...args), delay);
-						};
-					};
+        let playerInstance;
+        let apiLoaded = false;
 
-					// Обработчик изменения размера окна
-					window.addEventListener(
-						"resize",
-						debounce(() => {
-							if (!this.params.w && !this.params.h) {
-								this.player.setSize(
-									this.container.offsetWidth,
-									this.container.offsetHeight
-								);
-							}
-						}, 100)
-					);
-				}
-			}
+        function onYouTubeIframeAPIReady() {
+            apiLoaded = true;
+            initPlayer();
+        }
 
-			// Глобальная инициализация при загрузке API
-			let playerInstance;
-			function onYouTubeIframeAPIReady() {
-				playerInstance = new YouTubePlayer();
-			}
+        function initPlayer() {
+            if (!apiLoaded) {
+                setTimeout(initPlayer, 100);
+                return;
+            }
+            
+            try {
+                if (playerInstance) {
+                    playerInstance.player.destroy();
+                }
+                playerInstance = new YouTubePlayer();
+            } catch(e) {
+                console.error('Player init error:', e);
+                document.querySelector('.error-message').textContent = 
+                    'Ошибка инициализации. Обновите страницу.';
+            }
+        }
 
-			// Очистка ресурсов при закрытии
-			window.addEventListener("beforeunload", () => {
-				if (playerInstance) {
-					clearInterval(playerInstance.qualityInterval);
-				}
-			});
-		</script>
-	</body>
+        setTimeout(() => {
+            if (!apiLoaded) {
+                document.querySelector('.error-message').textContent = 
+                    'Ошибка загрузки YouTube API. Проверьте подключение.';
+            }
+        }, 10000);
+
+        window.addEventListener('beforeunload', () => {
+            if (playerInstance) {
+                playerInstance.player.stopVideo();
+                playerInstance.player.destroy();
+                clearInterval(playerInstance.qualityInterval);
+            }
+        });
+    </script>
+</body>
 </html>
